@@ -1,0 +1,149 @@
+# -----------------------------------
+# Installing necessary libraries
+# -----------------------------------
+!pip install scikit-learn tensorflow keras matplotlib seaborn --quiet
+
+# Importing libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+
+import warnings
+warnings.filterwarnings('ignore')
+
+# -----------------------------------
+# Step 1: Load the Dataset
+# -----------------------------------
+# Upload the traffic_data.csv file
+from google.colab import files
+uploaded = files.upload()
+
+# Reading the dataset
+data = pd.read_csv('traffic_data.csv')
+
+# Making sure 'Date' is treated as datetime type
+data['Date'] = pd.to_datetime(data['Date'])
+data.set_index('Date', inplace=True)
+
+print("Here's a quick look at our traffic data:")
+print(data.head())
+
+# -----------------------------------
+# Step 2: Exploratory Data Analysis (EDA)
+# -----------------------------------
+# Pairplot to visualize relationships
+sns.pairplot(data)
+plt.suptitle('Pairplot of Traffic Features', y=1.02)
+plt.show()
+
+# Heatmap to check correlations
+plt.figure(figsize=(10,6))
+sns.heatmap(data.corr(), annot=True, cmap='coolwarm')
+plt.title('Correlation Matrix of Traffic Features')
+plt.show()
+
+# -----------------------------------
+# Step 3: Feature Selection using Random Forest
+# -----------------------------------
+X = data[['Vehicle_Count', 'Avg_Speed', 'Signal_Timing', 'Weather_Condition']]
+y = data['Congestion_Level']
+
+# Building Random Forest Model
+rf = RandomForestRegressor(n_estimators=100, random_state=42)
+rf.fit(X, y)
+
+# Checking feature importance
+feature_importances = pd.DataFrame({
+    'Feature': X.columns,
+    'Importance': rf.feature_importances_
+}).sort_values(by='Importance', ascending=False)
+
+print("\nFeature Importance based on Random Forest:")
+print(feature_importances)
+
+# Plotting feature importance
+sns.barplot(x='Importance', y='Feature', data=feature_importances)
+plt.title('Feature Importance from Random Forest')
+plt.show()
+
+# -----------------------------------
+# Step 4: Preprocessing for LSTM
+# -----------------------------------
+# Selecting important features
+selected_features = ['Vehicle_Count', 'Avg_Speed', 'Signal_Timing']
+
+# Scaling the features
+scaler = MinMaxScaler()
+scaled_data = scaler.fit_transform(data[selected_features + ['Congestion_Level']])
+
+# Function to create sequences for LSTM
+def create_sequences(dataset, time_steps=10):
+    X, y = [], []
+    for i in range(time_steps, len(dataset)):
+        X.append(dataset[i-time_steps:i, :-1])
+        y.append(dataset[i, -1])
+    return np.array(X), np.array(y)
+
+# Preparing sequences
+time_steps = 10
+X_lstm, y_lstm = create_sequences(scaled_data, time_steps)
+
+# Splitting into train and test sets
+split = int(0.8 * len(X_lstm))
+X_train, X_test = X_lstm[:split], X_lstm[split:]
+y_train, y_test = y_lstm[:split], y_lstm[split:]
+
+# -----------------------------------
+# Step 5: Building the LSTM Model
+# -----------------------------------
+# Building a simple LSTM model
+model = Sequential([
+    LSTM(50, activation='relu', input_shape=(X_train.shape[1], X_train.shape[2])),
+    Dense(1)
+])
+
+model.compile(optimizer='adam', loss='mse')
+
+# Training the model
+history = model.fit(X_train, y_train, epochs=50, batch_size=16, validation_split=0.2, verbose=1)
+
+# -----------------------------------
+# Step 6: Evaluating the Model
+# -----------------------------------
+# Predicting on test set
+y_pred = model.predict(X_test)
+
+# Calculating evaluation metrics
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+mae = mean_absolute_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("\nModel Performance:")
+print(f"Root Mean Squared Error (RMSE): {rmse:.4f}")
+print(f"Mean Absolute Error (MAE): {mae:.4f}")
+print(f"R² Score: {r2:.4f}")
+
+# Plot True vs Predicted values
+plt.figure(figsize=(12,6))
+plt.plot(y_test, label='True Congestion Level')
+plt.plot(y_pred, label='Predicted Congestion Level')
+plt.legend()
+plt.title('True vs Predicted Traffic Congestion Level')
+plt.show()
+
+# -----------------------------------
+# Step 7: Traffic Flow Optimization Insights
+# -----------------------------------
+print("\nBased on our analysis, here are some recommendations:")
+print("- Optimize traffic signal timings at critical intersections identified by feature importance.")
+print("- Encourage speed management in zones with high congestion.")
+print("- Monitor the impact of adverse weather conditions on traffic flow for proactive management.")
+print("- Use predictive models to adjust traffic controls dynamically based on forecasted congestion.")
