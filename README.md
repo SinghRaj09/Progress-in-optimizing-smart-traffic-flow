@@ -1,6 +1,7 @@
 # Progress-in-optimizing-smart-traffic-flow
 
 Progress in Optimizing Traffic Flow 🚦🚗
+
 Overview
 This project focuses on developing models and strategies to optimize urban traffic flow, aiming to reduce congestion, travel time, and environmental impacts. By analyzing traffic data, infrastructure parameters, and external factors, predictive models and optimization techniques are implemented to improve traffic movement and urban mobility efficiency.
 
